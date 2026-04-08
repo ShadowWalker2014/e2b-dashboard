@@ -1,5 +1,6 @@
 /**
- * GET /api/builds/[buildId] — get build details including template names
+ * GET /api/builds/[buildId] — get build details
+ * Uses separate queries (no PostgREST joins) because env_builds has no FK constraints.
  */
 
 import { type NextRequest, NextResponse } from 'next/server'
@@ -34,32 +35,36 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ code: 403, message: 'not a team member' }, { status: 403 })
   }
 
+  // Get the build
   const { data: build, error } = await supabaseAdmin
     .from('env_builds')
-    .select(`
-      id,
-      env_id,
-      status,
-      reason,
-      created_at,
-      finished_at,
-      envs!inner ( team_id, id ),
-      env_aliases ( alias )
-    `)
+    .select('id, env_id, status, reason, created_at, finished_at')
     .eq('id', buildId)
-    .eq('envs.team_id', teamId)
     .single()
 
   if (error || !build) {
-    if (error?.code === 'PGRST116') {
-      return NextResponse.json({ code: 404, message: 'build not found' }, { status: 404 })
-    }
-    l.error({ key: 'api_build:db_error', error: error?.message }, 'failed to fetch build')
-    return NextResponse.json({ code: 500, message: error?.message ?? 'not found' }, { status: 500 })
+    return NextResponse.json({ code: 404, message: 'build not found' }, { status: 404 })
   }
 
-  const aliases = Array.isArray(build.env_aliases) ? build.env_aliases : []
-  const names = aliases.map((a: { alias: string }) => a.alias)
+  // Verify build belongs to this team
+  const { data: env } = await supabaseAdmin
+    .from('envs')
+    .select('id')
+    .eq('id', build.env_id)
+    .eq('team_id', teamId)
+    .single()
+
+  if (!env) {
+    return NextResponse.json({ code: 404, message: 'build not found' }, { status: 404 })
+  }
+
+  // Get template aliases
+  const { data: aliases } = await supabaseAdmin
+    .from('env_aliases')
+    .select('alias')
+    .eq('env_id', build.env_id)
+
+  const names = (aliases ?? []).map((a) => a.alias)
 
   return NextResponse.json({
     names: names.length > 0 ? names : null,

@@ -1,6 +1,6 @@
 /**
  * GET /api/builds/statuses — get status for specific build IDs
- * Query: build_ids (comma-separated or repeated)
+ * Uses separate queries (no PostgREST joins) because env_builds has no FK constraints.
  */
 
 import { type NextRequest, NextResponse } from 'next/server'
@@ -39,23 +39,35 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ buildStatuses: [] })
   }
 
-  const { data, error } = await supabaseAdmin
+  // Get builds by ID
+  const { data: builds, error } = await supabaseAdmin
     .from('env_builds')
-    .select('id, status, finished_at, reason, envs!inner ( team_id )')
+    .select('id, env_id, status, finished_at, reason')
     .in('id', buildIds)
-    .eq('envs.team_id', teamId)
 
   if (error) {
     l.error({ key: 'api_builds_statuses:db_error', error: error.message }, 'failed to fetch build statuses')
     return NextResponse.json({ code: 500, message: error.message }, { status: 500 })
   }
 
-  const buildStatuses = (data ?? []).map((row) => ({
-    id: row.id,
-    status: row.status as 'building' | 'failed' | 'success',
-    finishedAt: row.finished_at ?? null,
-    statusMessage: extractStatusMessage(row.reason),
-  }))
+  // Verify all returned builds belong to this team
+  const envIds = [...new Set((builds ?? []).map((b) => b.env_id))]
+  const { data: teamEnvs } = await supabaseAdmin
+    .from('envs')
+    .select('id')
+    .eq('team_id', teamId)
+    .in('id', envIds)
+
+  const teamEnvSet = new Set((teamEnvs ?? []).map((e) => e.id))
+
+  const buildStatuses = (builds ?? [])
+    .filter((b) => teamEnvSet.has(b.env_id))
+    .map((row) => ({
+      id: row.id,
+      status: row.status as 'building' | 'failed' | 'success',
+      finishedAt: row.finished_at ?? null,
+      statusMessage: extractStatusMessage(row.reason),
+    }))
 
   return NextResponse.json({ buildStatuses })
 }
