@@ -46,6 +46,16 @@ export default function BuildPage({
     notFound()
   }
 
+  if (error && !isPending) {
+    return (
+      <div className="h-full min-h-0 flex-1 p-3 md:p-6 flex items-center justify-center">
+        <p className="text-fg-secondary prose-body">
+          Failed to load build details. Please try again.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="h-full min-h-0 flex-1 p-3 md:p-6 flex flex-col gap-6">
       <BuildHeader
