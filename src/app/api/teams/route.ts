@@ -17,52 +17,71 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ code: 401, message: 'invalid token' }, { status: 401 })
   }
 
-  // Query from users_teams joining teams + team_limits
-  const { data, error } = await supabaseAdmin
+  // Step 1: get team memberships for user
+  const { data: memberships, error: membershipsError } = await supabaseAdmin
     .from('users_teams')
-    .select(`
-      is_default,
-      teams (
-        id, name, slug, email, tier,
-        is_banned, is_blocked, blocked_reason, profile_picture_url,
-        team_limits ( max_length_hours, concurrent_sandboxes,
-          concurrent_template_builds, max_vcpu, max_ram_mb, disk_mb )
-      )
-    `)
+    .select('team_id, is_default')
     .eq('user_id', user.id)
 
-  if (error) {
-    l.error({ key: 'api_teams:db_error', error: error.message, code: error.code }, 'failed to fetch teams')
-    return NextResponse.json({ code: 500, message: error.message }, { status: 500 })
+  if (membershipsError) {
+    l.error({ key: 'api_teams:memberships_error', error: membershipsError.message }, 'failed to fetch memberships')
+    return NextResponse.json({ code: 500, message: membershipsError.message }, { status: 500 })
   }
 
-  const teams = (data ?? [])
-    .map((row) => {
-      const t = row.teams as Record<string, unknown> | null
-      if (!t) return null
-      const tl = Array.isArray(t.team_limits) ? t.team_limits[0] : t.team_limits
-      return {
-        id: t.id,
-        name: t.name,
-        slug: t.slug,
-        tier: t.tier,
-        email: t.email,
-        profilePictureUrl: t.profile_picture_url ?? null,
-        isBlocked: t.is_blocked ?? false,
-        isBanned: t.is_banned ?? false,
-        blockedReason: t.blocked_reason ?? null,
-        isDefault: row.is_default ?? false,
-        limits: {
-          maxLengthHours: Number(tl?.max_length_hours ?? 0),
-          concurrentSandboxes: Number(tl?.concurrent_sandboxes ?? 0),
-          concurrentTemplateBuilds: Number(tl?.concurrent_template_builds ?? 0),
-          maxVcpu: Number(tl?.max_vcpu ?? 0),
-          maxRamMb: Number(tl?.max_ram_mb ?? 0),
-          diskMb: Number(tl?.disk_mb ?? 0),
-        },
-      }
-    })
-    .filter(Boolean)
+  if (!memberships || memberships.length === 0) {
+    return NextResponse.json({ teams: [] })
+  }
 
-  return NextResponse.json({ teams })
+  const teamIds = memberships.map((m) => m.team_id)
+
+  // Step 2: get team details
+  const { data: teams, error: teamsError } = await supabaseAdmin
+    .from('teams')
+    .select('id, name, slug, email, tier, is_banned, is_blocked, blocked_reason, profile_picture_url')
+    .in('id', teamIds)
+
+  if (teamsError) {
+    l.error({ key: 'api_teams:teams_error', error: teamsError.message }, 'failed to fetch teams')
+    return NextResponse.json({ code: 500, message: teamsError.message }, { status: 500 })
+  }
+
+  // Step 3: get limits (team_limits.id = teams.id, no FK but same PK)
+  const { data: limits, error: limitsError } = await supabaseAdmin
+    .from('team_limits')
+    .select('id, max_length_hours, concurrent_sandboxes, concurrent_template_builds, max_vcpu, max_ram_mb, disk_mb')
+    .in('id', teamIds)
+
+  if (limitsError) {
+    l.error({ key: 'api_teams:limits_error', error: limitsError.message }, 'failed to fetch limits')
+    return NextResponse.json({ code: 500, message: limitsError.message }, { status: 500 })
+  }
+
+  const limitsMap = Object.fromEntries((limits ?? []).map((tl) => [tl.id, tl]))
+  const membershipMap = Object.fromEntries(memberships.map((m) => [m.team_id, m.is_default]))
+
+  const result = (teams ?? []).map((t) => {
+    const tl = limitsMap[t.id]
+    return {
+      id: t.id,
+      name: t.name,
+      slug: t.slug,
+      tier: t.tier,
+      email: t.email,
+      profilePictureUrl: t.profile_picture_url ?? null,
+      isBlocked: t.is_blocked ?? false,
+      isBanned: t.is_banned ?? false,
+      blockedReason: t.blocked_reason ?? null,
+      isDefault: membershipMap[t.id] ?? false,
+      limits: {
+        maxLengthHours: Number(tl?.max_length_hours ?? 0),
+        concurrentSandboxes: Number(tl?.concurrent_sandboxes ?? 0),
+        concurrentTemplateBuilds: Number(tl?.concurrent_template_builds ?? 0),
+        maxVcpu: Number(tl?.max_vcpu ?? 0),
+        maxRamMb: Number(tl?.max_ram_mb ?? 0),
+        diskMb: Number(tl?.disk_mb ?? 0),
+      },
+    }
+  })
+
+  return NextResponse.json({ teams: result })
 }

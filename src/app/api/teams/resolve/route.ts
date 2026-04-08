@@ -22,20 +22,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ code: 401, message: 'invalid token' }, { status: 401 })
   }
 
-  // Check user is a member of this team
-  const { data, error } = await supabaseAdmin
-    .from('users_teams')
-    .select('teams ( id, slug )')
-    .eq('user_id', user.id)
-    .eq('teams.slug', slug)
+  // Find team by slug
+  const { data: team, error: teamError } = await supabaseAdmin
+    .from('teams')
+    .select('id, slug')
+    .eq('slug', slug)
     .single()
 
-  if (error || !data?.teams) {
-    l.warn({ key: 'api_teams_resolve:not_found', slug, user_id: user.id, error: error?.message }, 'team not found')
+  if (teamError || !team) {
+    l.warn({ key: 'api_teams_resolve:team_not_found', slug }, 'team not found')
     return NextResponse.json({ code: 404, message: 'team not found' }, { status: 404 })
   }
 
-  const team = Array.isArray(data.teams) ? data.teams[0] : data.teams
+  // Verify user is a member
+  const { data: membership, error: membershipError } = await supabaseAdmin
+    .from('users_teams')
+    .select('team_id')
+    .eq('user_id', user.id)
+    .eq('team_id', team.id)
+    .single()
+
+  if (membershipError || !membership) {
+    l.warn({ key: 'api_teams_resolve:not_member', slug, user_id: user.id }, 'user not member of team')
+    return NextResponse.json({ code: 404, message: 'team not found' }, { status: 404 })
+  }
 
   return NextResponse.json({ id: team.id, slug: team.slug })
 }
