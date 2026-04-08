@@ -24,22 +24,29 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const requestOrigin = request.nextUrl.origin
 
-  const token_hash = searchParams.get('token_hash')
-  const type = searchParams.get('type')
-  let next = searchParams.get('next')
+  const rawTokenHash = searchParams.get('token_hash')
+  const rawType = searchParams.get('type')
+  let resolvedNext = searchParams.get('next')
 
-  if (next && next.startsWith('/') && !next.startsWith('//')) {
-    next = `${requestOrigin}${next}`
+  if (
+    resolvedNext &&
+    resolvedNext.startsWith('/') &&
+    !resolvedNext.startsWith('//')
+  ) {
+    resolvedNext = `${requestOrigin}${resolvedNext}`
   }
 
-  if ((!next || next.length === 0) && type === 'recovery') {
-    next = `${requestOrigin}${PROTECTED_URLS.RESET_PASSWORD}`
+  if (
+    (!resolvedNext || resolvedNext.length === 0) &&
+    rawType === 'recovery'
+  ) {
+    resolvedNext = `${requestOrigin}${PROTECTED_URLS.RESET_PASSWORD}`
   }
 
   const result = confirmSchema.safeParse({
-    token_hash,
-    type,
-    next,
+    token_hash: rawTokenHash,
+    type: rawType,
+    next: resolvedNext,
   })
 
   const dashboardSignInUrl = new URL(request.nextUrl.origin + AUTH_URLS.SIGN_IN)
