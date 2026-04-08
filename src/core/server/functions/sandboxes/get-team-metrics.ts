@@ -5,6 +5,8 @@ import {
   authActionClient,
   withTeamSlugResolution,
 } from '@/core/server/actions/client'
+import { returnServerError } from '@/core/server/actions/utils'
+import { getPublicErrorMessage } from '@/core/shared/errors'
 import { TeamSlugSchema } from '@/core/shared/schemas/team'
 import { MAX_DAYS_AGO } from '@/features/dashboard/sandboxes/monitoring/time-picker/constants'
 import { getTeamMetricsCore } from './get-team-metrics-core'
@@ -62,9 +64,8 @@ export const getTeamMetrics = authActionClient
       endMs: endDateMs,
     })
 
-    // Gracefully return empty metrics when ClickHouse is unavailable.
     if (result.error) {
-      return { metrics: [], step: 0 }
+      return returnServerError(getPublicErrorMessage({ status: result.status }))
     }
 
     return result.data

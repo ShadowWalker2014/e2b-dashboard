@@ -69,11 +69,8 @@ export const sandboxesRouter = createTRPCRouter({
 
       const metricsDataResult =
         await ctx.sandboxesRepository.getSandboxesMetrics(sandboxIds)
-
-      // Gracefully return empty metrics when the Argus metrics service is
-      // unavailable (not configured or not running in this deployment).
       if (!metricsDataResult.ok) {
-        return { metrics: {} }
+        throwTRPCErrorFromRepoError(metricsDataResult.error)
       }
 
       const metricsData = metricsDataResult.data
@@ -120,9 +117,8 @@ export const sandboxesRouter = createTRPCRouter({
           endS + overfetchS
         )
 
-      // Gracefully return empty metrics when ClickHouse is unavailable.
       if (!metricDataResult.ok) {
-        return { metrics: [], step: stepMs }
+        throwTRPCErrorFromRepoError(metricDataResult.error)
       }
       const metricData = metricDataResult.data
 
