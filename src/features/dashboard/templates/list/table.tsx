@@ -1,6 +1,6 @@
 'use client'
 
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
 import {
   type ColumnFiltersState,
   type ColumnSizingState,
@@ -47,7 +47,7 @@ export default function TemplatesTable() {
     )
   )
 
-  const { data: defaultTemplatesData } = useSuspenseQuery(
+  const { data: defaultTemplatesData } = useQuery(
     trpc.templates.getDefaultTemplatesCached.queryOptions(undefined, {
       refetchOnMount: false,
       refetchOnWindowFocus: false,
