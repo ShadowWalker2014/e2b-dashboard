@@ -33,9 +33,10 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ code: 403, message: 'not a team member' }, { status: 403 })
   }
 
+  // Use the FK constraint name to disambiguate: user_id → users vs added_by → users
   const { data: memberships, error } = await supabaseAdmin
     .from('users_teams')
-    .select('user_id, is_default, added_by, created_at, users!inner(email)')
+    .select('user_id, is_default, added_by, created_at, users!users_teams_users_users(email)')
     .eq('team_id', teamId)
 
   if (error) {
