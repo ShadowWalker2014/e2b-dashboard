@@ -8,9 +8,7 @@ import {
   authActionClient,
   withTeamSlugResolution,
 } from '@/core/server/actions/client'
-import { handleDefaultInfraError } from '@/core/server/actions/utils'
 import { infra } from '@/core/shared/clients/api'
-import { l } from '@/core/shared/clients/logger/logger'
 import { TeamSlugSchema } from '@/core/shared/schemas/team'
 import { MAX_DAYS_AGO } from '@/features/dashboard/sandboxes/monitoring/time-picker/constants'
 
@@ -85,25 +83,8 @@ export const getTeamMetricsMax = authActionClient
     })
 
     if (res.error) {
-      const status = res.response.status
-
-      l.error(
-        {
-          key: 'get_team_metrics_max:infra_error',
-          error: res.error,
-          team_id: teamId,
-          user_id: session.user.id,
-          context: {
-            status,
-            startDate: startDateMs,
-            endDate: endDateMs,
-            metric,
-          },
-        },
-        `Failed to get team metrics max: ${res.error.message}`
-      )
-
-      return handleDefaultInfraError(status, res.error)
+      // Gracefully return null when the metrics service (ClickHouse) is unavailable.
+      return null
     }
 
     // since javascript timestamps are in milliseconds, we want to convert the timestamp back to milliseconds
