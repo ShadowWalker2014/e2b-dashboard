@@ -16,7 +16,7 @@ export function encodedRedirect(
   queryParams?: Record<string, string>
 ) {
   const queryString = new URLSearchParams()
-  queryString.set(type, encodeURIComponent(message))
+  queryString.set(type, message)
   if (queryParams) {
     Object.entries(queryParams).forEach(([key, value]) => {
       queryString.set(key, value)

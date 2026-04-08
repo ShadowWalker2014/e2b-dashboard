@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import type { NextRequest } from 'next/server'
 import { z } from 'zod'
-import { AUTH_URLS } from '@/configs/urls'
+import { AUTH_URLS, PROTECTED_URLS } from '@/configs/urls'
 import { OtpTypeSchema } from '@/core/modules/auth/models'
 import { l } from '@/core/shared/clients/logger/logger'
 import { encodedRedirect, isExternalOrigin } from '@/lib/utils/auth'
@@ -22,11 +22,24 @@ const confirmSchema = z.object({
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
+  const requestOrigin = request.nextUrl.origin
+
+  const token_hash = searchParams.get('token_hash')
+  const type = searchParams.get('type')
+  let next = searchParams.get('next')
+
+  if (next && next.startsWith('/') && !next.startsWith('//')) {
+    next = `${requestOrigin}${next}`
+  }
+
+  if ((!next || next.length === 0) && type === 'recovery') {
+    next = `${requestOrigin}${PROTECTED_URLS.RESET_PASSWORD}`
+  }
 
   const result = confirmSchema.safeParse({
-    token_hash: searchParams.get('token_hash'),
-    type: searchParams.get('type'),
-    next: searchParams.get('next'),
+    token_hash,
+    type,
+    next,
   })
 
   const dashboardSignInUrl = new URL(request.nextUrl.origin + AUTH_URLS.SIGN_IN)

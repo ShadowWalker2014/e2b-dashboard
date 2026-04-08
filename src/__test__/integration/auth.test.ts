@@ -68,12 +68,21 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/lib/utils/auth', () => ({
-  encodedRedirect: vi.fn((type, url, message, params) => ({
-    type,
-    destination: `${url}?${type}=${encodeURIComponent(message)}${params ? `&${new URLSearchParams(params).toString()}` : ''}`,
-    message,
-    params,
-  })),
+  encodedRedirect: vi.fn((type, url, message, params) => {
+    const q = new URLSearchParams()
+    q.set(type, message)
+    if (params) {
+      for (const [key, value] of Object.entries(params)) {
+        q.set(key, value)
+      }
+    }
+    return {
+      type,
+      destination: `${url}?${q.toString()}`,
+      message,
+      params,
+    }
+  }),
 }))
 
 // Use the hoisted mock functions in the module mock
@@ -337,6 +346,12 @@ describe('Auth Actions - Integration Tests', () => {
       expect(result).toBeDefined()
       expect(result).not.toHaveProperty('serverError')
       expect(result).not.toHaveProperty('validationErrors')
+      expect(mockSupabaseClient.auth.resetPasswordForEmail).toHaveBeenCalledWith(
+        'user@example.com',
+        {
+          redirectTo: `https://app.e2b.dev${PROTECTED_URLS.RESET_PASSWORD}`,
+        }
+      )
     })
 
     /**

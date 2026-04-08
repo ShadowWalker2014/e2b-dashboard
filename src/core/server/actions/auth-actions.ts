@@ -1,6 +1,5 @@
 'use server'
 
-import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { returnValidationErrors } from 'next-safe-action'
 import { z } from 'zod'
@@ -22,6 +21,7 @@ import { l } from '@/core/shared/clients/logger/logger'
 import { createClient } from '@/core/shared/clients/supabase/server'
 import { relativeUrlSchema } from '@/core/shared/schemas/url'
 import { verifyTurnstileToken } from '@/lib/captcha/turnstile'
+import { getRequestOrigin } from '@/lib/utils/request-origin'
 import { encodedRedirect } from '@/lib/utils/auth'
 
 async function validateCaptcha(captchaToken: string | undefined) {
@@ -87,13 +87,7 @@ export const signInWithOAuthAction = actionClient
 
     const supabase = await createClient()
 
-    const headerStore = await headers()
-
-    const origin = headerStore.get('origin')
-
-    if (!origin) {
-      throw new Error('Origin not found')
-    }
+    const origin = await getRequestOrigin()
 
     l.info(
       {
@@ -135,6 +129,16 @@ export const signInWithOAuthAction = actionClient
       )
     }
 
+    if (!data.url) {
+      const queryParams = returnTo ? { returnTo } : undefined
+      throw encodedRedirect(
+        'error',
+        AUTH_URLS.SIGN_IN,
+        'Could not start OAuth sign-in.',
+        queryParams
+      )
+    }
+
     throw redirect(data.url)
   })
 
@@ -160,13 +164,8 @@ export const signUpAction = actionClient
       }
 
       const supabase = await createClient()
-      const headerStore = await headers()
 
-      const origin = headerStore.get('origin')
-
-      if (!origin) {
-        throw new Error('Origin not found')
-      }
+      const origin = await getRequestOrigin()
 
       // basic security check, that password does not equal e-mail
       if (password && email && password.toLowerCase() === email.toLowerCase()) {
@@ -234,13 +233,7 @@ export const signInAction = actionClient
 
     const supabase = await createClient()
 
-    const headerStore = await headers()
-
-    const origin = headerStore.get('origin')
-
-    if (!origin) {
-      throw new Error('Origin not found')
-    }
+    const origin = await getRequestOrigin()
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -287,7 +280,11 @@ export const forgotPasswordAction = actionClient
 
     const supabase = await createClient()
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email)
+    const origin = await getRequestOrigin()
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${origin}${PROTECTED_URLS.RESET_PASSWORD}`,
+    })
 
     if (error) {
       l.error(

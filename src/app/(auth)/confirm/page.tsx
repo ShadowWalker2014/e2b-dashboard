@@ -2,7 +2,7 @@
 
 import { useMutation } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useMemo, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { AUTH_URLS } from '@/configs/urls'
 import {
   type ConfirmEmailInput,
@@ -56,13 +56,25 @@ async function verifyOtp(input: ConfirmEmailInput): Promise<VerifyOtpResponse> {
     body: JSON.stringify(input),
   })
 
-  return response.json()
+  const data: unknown = await response.json()
+  if (
+    !data ||
+    typeof data !== 'object' ||
+    !('redirectUrl' in data) ||
+    typeof (data as VerifyOtpResponse).redirectUrl !== 'string' ||
+    !(data as VerifyOtpResponse).redirectUrl
+  ) {
+    throw new Error('Invalid verification response')
+  }
+
+  return data as VerifyOtpResponse
 }
 
 export default function ConfirmPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
+  const [requestError, setRequestError] = useState<string | undefined>()
 
   const params = useMemo(() => {
     const tokenHash = searchParams.get('token_hash') ?? ''
@@ -91,14 +103,21 @@ export default function ConfirmPage() {
   const mutation = useMutation({
     mutationFn: verifyOtp,
     onSuccess: (data) => {
+      setRequestError(undefined)
       startTransition(() => {
         router.push(data.redirectUrl)
       })
+    },
+    onError: () => {
+      setRequestError(
+        'Something went wrong. Check your connection and try again.'
+      )
     },
   })
 
   const handleConfirm = () => {
     if (!isValidParams || !params.type) return
+    setRequestError(undefined)
 
     mutation.mutate({
       token_hash: params.tokenHash,
@@ -142,6 +161,10 @@ export default function ConfirmPage() {
             error: 'Invalid verification link. Please request a new one.',
           }}
         />
+      )}
+
+      {requestError && (
+        <AuthFormMessage className="mt-4" message={{ error: requestError }} />
       )}
     </div>
   )
