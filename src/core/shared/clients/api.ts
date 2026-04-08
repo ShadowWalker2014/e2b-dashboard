@@ -11,7 +11,7 @@ const INFRA_API_URL =
 
 const DASHBOARD_API_URL =
   process.env.NEXT_PUBLIC_DASHBOARD_API_URL ||
-  `https://dashboard-api.${process.env.NEXT_PUBLIC_E2B_DOMAIN}`
+  `https://api.${process.env.NEXT_PUBLIC_E2B_DOMAIN}`
 
 export const infra = createClient<CombinedPaths>({
   baseUrl: INFRA_API_URL,
