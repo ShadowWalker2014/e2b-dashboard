@@ -9,9 +9,11 @@ const INFRA_API_URL =
   process.env.NEXT_PUBLIC_INFRA_API_URL ||
   `https://api.${process.env.NEXT_PUBLIC_E2B_DOMAIN}`
 
+// Falls back to the dashboard's own API routes which proxy Supabase directly,
+// bypassing the need for a separate dashboard-api Go service.
 const DASHBOARD_API_URL =
   process.env.NEXT_PUBLIC_DASHBOARD_API_URL ||
-  `https://api.${process.env.NEXT_PUBLIC_E2B_DOMAIN}`
+  `https://www.${process.env.NEXT_PUBLIC_E2B_DOMAIN}/api`
 
 export const infra = createClient<CombinedPaths>({
   baseUrl: INFRA_API_URL,
