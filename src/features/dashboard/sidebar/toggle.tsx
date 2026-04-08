@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from 'motion/react'
 import useKeydown from '@/lib/hooks/use-keydown'
 import { cn } from '@/lib/utils'
 import { E2BLogo } from '@/ui/brand'
-import ClientOnly from '@/ui/client-only'
 import { Button } from '@/ui/primitives/button'
 import { useSidebar } from '@/ui/primitives/sidebar'
 import ShortcutTooltip from '@/ui/shortcut-tooltip'
@@ -41,10 +40,10 @@ export default function DashboardSidebarToggle() {
             animate="visible"
             exit="hidden"
           >
-            <ClientOnly className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1.5">
               <E2BLogo className="size-6" />
               <span className="prose-headline-small">E2B</span>
-            </ClientOnly>
+            </span>
           </motion.span>
         )}
       </AnimatePresence>
