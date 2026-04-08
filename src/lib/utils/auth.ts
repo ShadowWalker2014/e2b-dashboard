@@ -15,14 +15,14 @@ export function encodedRedirect(
   message: string,
   queryParams?: Record<string, string>
 ) {
-  const queryString = new URLSearchParams()
-  queryString.set(type, message)
+  const url = new URL(path, 'https://n')
+  url.searchParams.set(type, message)
   if (queryParams) {
     Object.entries(queryParams).forEach(([key, value]) => {
-      queryString.set(key, value)
+      url.searchParams.set(key, value)
     })
   }
-  return redirect(`${path}?${queryString.toString()}`)
+  return redirect(`${path.split('?')[0]}?${url.searchParams.toString()}`)
 }
 
 export function getUserProviders(user: User) {

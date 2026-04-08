@@ -22,7 +22,7 @@ const confirmSchema = z.object({
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const requestOrigin = request.nextUrl.origin
+  const origin = request.nextUrl.origin
 
   const rawTokenHash = searchParams.get('token_hash')
   const rawType = searchParams.get('type')
@@ -33,14 +33,11 @@ export async function GET(request: NextRequest) {
     resolvedNext.startsWith('/') &&
     !resolvedNext.startsWith('//')
   ) {
-    resolvedNext = `${requestOrigin}${resolvedNext}`
+    resolvedNext = `${origin}${resolvedNext}`
   }
 
-  if (
-    (!resolvedNext || resolvedNext.length === 0) &&
-    rawType === 'recovery'
-  ) {
-    resolvedNext = `${requestOrigin}${PROTECTED_URLS.RESET_PASSWORD}`
+  if ((!resolvedNext || resolvedNext.length === 0) && rawType === 'recovery') {
+    resolvedNext = `${origin}${PROTECTED_URLS.RESET_PASSWORD}`
   }
 
   const result = confirmSchema.safeParse({
@@ -49,7 +46,7 @@ export async function GET(request: NextRequest) {
     next: resolvedNext,
   })
 
-  const dashboardSignInUrl = new URL(request.nextUrl.origin + AUTH_URLS.SIGN_IN)
+  const dashboardSignInUrl = new URL(origin + AUTH_URLS.SIGN_IN)
 
   if (!result.success) {
     l.error({
@@ -69,8 +66,7 @@ export async function GET(request: NextRequest) {
   }
 
   const { token_hash, type, next } = result.data
-  const dashboardOrigin = request.nextUrl.origin
-  const isDifferentOrigin = isExternalOrigin(next, dashboardOrigin)
+  const isDifferentOrigin = isExternalOrigin(next, origin)
 
   l.info(
     {
@@ -80,7 +76,7 @@ export async function GET(request: NextRequest) {
         type,
         next,
         is_different_origin: isDifferentOrigin,
-        origin: dashboardOrigin,
+        origin,
       },
     },
     `confirming email with OTP token hash: ${token_hash.slice(0, 10)}`
@@ -105,7 +101,7 @@ export async function GET(request: NextRequest) {
     throw redirect(supabaseClientFlowUrl.toString())
   }
 
-  const confirmPageUrl = new URL(dashboardOrigin + AUTH_URLS.CONFIRM)
+  const confirmPageUrl = new URL(origin + AUTH_URLS.CONFIRM)
   confirmPageUrl.searchParams.set('token_hash', token_hash)
   confirmPageUrl.searchParams.set('type', type)
   confirmPageUrl.searchParams.set('next', next)

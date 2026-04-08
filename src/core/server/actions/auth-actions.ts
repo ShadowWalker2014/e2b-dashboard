@@ -233,8 +233,6 @@ export const signInAction = actionClient
 
     const supabase = await createClient()
 
-    const origin = await getRequestOrigin()
-
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -250,11 +248,9 @@ export const signInAction = actionClient
       throw error
     }
 
-    // handle extra case for password reset
-    if (
-      returnTo.trim().length > 0 &&
-      returnTo === PROTECTED_URLS.ACCOUNT_SETTINGS
-    ) {
+    // handle extra case for password reset — needs absolute URL with reauth param
+    if (returnTo.trim().length > 0 && returnTo === PROTECTED_URLS.ACCOUNT_SETTINGS) {
+      const origin = await getRequestOrigin()
       const url = new URL(returnTo, origin)
 
       url.searchParams.set('reauth', '1')

@@ -34,27 +34,30 @@ export async function GET(request: NextRequest) {
 
   const teamIds = memberships.map((m) => m.team_id)
 
-  // Step 2: get team details
-  const { data: teams, error: teamsError } = await supabaseAdmin
-    .from('teams')
-    .select('id, name, slug, email, tier, is_banned, is_blocked, blocked_reason, profile_picture_url')
-    .in('id', teamIds)
+  // Steps 2 & 3 in parallel — teams and limits are independent queries
+  const [teamsResult, limitsResult] = await Promise.all([
+    supabaseAdmin
+      .from('teams')
+      .select('id, name, slug, email, tier, is_banned, is_blocked, blocked_reason, profile_picture_url')
+      .in('id', teamIds),
+    supabaseAdmin
+      .from('team_limits')
+      .select('id, max_length_hours, concurrent_sandboxes, concurrent_template_builds, max_vcpu, max_ram_mb, disk_mb')
+      .in('id', teamIds),
+  ])
 
-  if (teamsError) {
-    l.error({ key: 'api_teams:teams_error', error: teamsError.message }, 'failed to fetch teams')
-    return NextResponse.json({ code: 500, message: teamsError.message }, { status: 500 })
+  if (teamsResult.error) {
+    l.error({ key: 'api_teams:teams_error', error: teamsResult.error.message }, 'failed to fetch teams')
+    return NextResponse.json({ code: 500, message: teamsResult.error.message }, { status: 500 })
   }
 
-  // Step 3: get limits (team_limits.id = teams.id, no FK but same PK)
-  const { data: limits, error: limitsError } = await supabaseAdmin
-    .from('team_limits')
-    .select('id, max_length_hours, concurrent_sandboxes, concurrent_template_builds, max_vcpu, max_ram_mb, disk_mb')
-    .in('id', teamIds)
-
-  if (limitsError) {
-    l.error({ key: 'api_teams:limits_error', error: limitsError.message }, 'failed to fetch limits')
-    return NextResponse.json({ code: 500, message: limitsError.message }, { status: 500 })
+  if (limitsResult.error) {
+    l.error({ key: 'api_teams:limits_error', error: limitsResult.error.message }, 'failed to fetch limits')
+    return NextResponse.json({ code: 500, message: limitsResult.error.message }, { status: 500 })
   }
+
+  const teams = teamsResult.data
+  const limits = limitsResult.data
 
   const limitsMap = Object.fromEntries((limits ?? []).map((tl) => [tl.id, tl]))
   const membershipMap = Object.fromEntries(memberships.map((m) => [m.team_id, m.is_default]))

@@ -22,6 +22,12 @@ const BLOCKED_HEADERS = new Set([
   'te',
   'trailer',
   'keep-alive',
+  // Never forward cookies to a third-party API — auth is via X-Supabase-Token
+  'cookie',
+  'set-cookie',
+  // Never forward proxy auth headers upstream
+  'proxy-authorization',
+  'proxy-authenticate',
 ])
 
 async function proxy(request: NextRequest, path: string): Promise<NextResponse> {
@@ -53,8 +59,8 @@ async function proxy(request: NextRequest, path: string): Promise<NextResponse> 
   const ct = res.headers.get('content-type')
   if (ct) responseHeaders.set('content-type', ct)
 
-  const body = await res.text()
-  return new NextResponse(body, {
+  const responseBody = await res.text()
+  return new NextResponse(responseBody, {
     status: res.status,
     headers: responseHeaders,
   })
