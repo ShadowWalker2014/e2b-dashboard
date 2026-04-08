@@ -70,6 +70,7 @@ export function useSandboxesMetrics({
       refetchOnMount: false,
       refetchOnReconnect: true,
       refetchIntervalInBackground: false,
+      retry: false,
     })
   )
 
