@@ -13,12 +13,16 @@ const INFRA_BASE =
   process.env.NEXT_PUBLIC_INFRA_API_URL ||
   `https://api.${process.env.NEXT_PUBLIC_E2B_DOMAIN}`
 
-const FORWARDED_HEADERS = [
-  'x-supabase-token',
-  'x-supabase-team',
-  'content-type',
-  'accept',
-]
+// Headers that should NOT be forwarded to the upstream service
+const BLOCKED_HEADERS = new Set([
+  'host',
+  'connection',
+  'transfer-encoding',
+  'upgrade',
+  'te',
+  'trailer',
+  'keep-alive',
+])
 
 async function proxy(request: NextRequest, path: string): Promise<NextResponse> {
   const url = new URL(path, INFRA_BASE)
@@ -26,11 +30,13 @@ async function proxy(request: NextRequest, path: string): Promise<NextResponse> 
     url.searchParams.set(key, value)
   })
 
+  // Forward ALL incoming headers except blocked ones
   const headers = new Headers()
-  for (const key of FORWARDED_HEADERS) {
-    const val = request.headers.get(key)
-    if (val) headers.set(key, val)
-  }
+  request.headers.forEach((val, key) => {
+    if (!BLOCKED_HEADERS.has(key.toLowerCase())) {
+      headers.set(key, val)
+    }
+  })
 
   const init: RequestInit = {
     method: request.method,
